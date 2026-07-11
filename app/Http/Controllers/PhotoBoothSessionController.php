@@ -164,7 +164,7 @@ class PhotoBoothSessionController extends Controller
             // Ambil file urutan pertama (paling baru)
             $latestFile = $files[0];
             $filename = $latestFile->getFilename();
-            $url = 'http://localhost:8000/api/raw-photo/' . $filename;
+            $url = url('api/raw-photo/' . $filename);
 
             return response()->json([
                 'success' => true,
