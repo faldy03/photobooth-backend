@@ -7,7 +7,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\VoucherController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\TransactionController;
-use App\Http\middleware\IsAdmin;
+use App\Http\Middleware\IsAdmin;
 use App\Http\Controllers\KioskDeviceController;
 use App\Http\Controllers\PhotoAssetController;
 use App\Http\Controllers\SystemSettingController;
