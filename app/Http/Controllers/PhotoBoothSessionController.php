@@ -39,10 +39,38 @@ class PhotoBoothSessionController extends Controller
             Storage::disk('public')->put($finalFilePath, $imageBase64);
             $finalUrl = asset('storage/sessions/' . $finalFileName);
 
+            // Safety Fallback: Jika transaction_id dikirim tetapi tidak ada di DB (karena database di-reset)
+            $transactionId = $request->transaction_id;
+            if ($transactionId) {
+                $transactionExists = DB::table('transactions')->where('id', $transactionId)->exists();
+                if (!$transactionExists) {
+                    DB::table('transactions')->insert([
+                        'id' => $transactionId,
+                        'invoice_number' => 'INV-DUMMY-' . $transactionId . '-' . time(),
+                        'gross_amount' => 30000.00,
+                        'net_amount' => 30000.00,
+                        'payment_status' => 'success',
+                        'created_at' => Carbon::now(),
+                        'updated_at' => Carbon::now(),
+                    ]);
+                }
+            } else {
+                // Jika tidak ada transaction_id sama sekali, buat transaksi baru untuk memenuhi foreign key
+                $newTransactionId = DB::table('transactions')->insertGetId([
+                    'invoice_number' => 'INV-AUTO-' . time() . '-' . Str::random(5),
+                    'gross_amount' => 30000.00,
+                    'net_amount' => 30000.00,
+                    'payment_status' => 'success',
+                    'created_at' => Carbon::now(),
+                    'updated_at' => Carbon::now(),
+                ]);
+                $transactionId = $newTransactionId;
+            }
+
             // Simpan ke Database
             $session = PhotoboothSession::create([
                 'session_uuid' => $sessionUuid,
-                'transaction_id' => $request->transaction_id,
+                'transaction_id' => $transactionId,
                 'kiosk_device_id' => $request->kiosk_device_id,
                 'start_time' => Carbon::now(),
                 'end_time' => Carbon::now(),
@@ -86,8 +114,9 @@ class PhotoBoothSessionController extends Controller
 
             DB::commit();
 
-            // 🚀 Lempar Tugas Upload GDrive ke Latar Belakang
-            UploadPhotoToGoogleDrive::dispatch($finalFileName, $finalFilePath, $rawPhotosForQueue);
+            // 🚀 Lempar Tugas Upload GDrive ke Latar Belakang dengan nama folder per sesi
+            $sessionFolderName = 'Session_' . Carbon::now()->format('Y-m-d_H-i-s') . '_' . substr($sessionUuid, 0, 8);
+            UploadPhotoToGoogleDrive::dispatch($finalFileName, $finalFilePath, $rawPhotosForQueue, $sessionFolderName);
 
             // Balas ke Next.js dengan membawa final_photo_base64 agar bisa diprint lokal
             return response()->json([
@@ -143,14 +172,24 @@ class PhotoBoothSessionController extends Controller
     {
         try {
             $directory = public_path('raw_photos');
+            $xamppDirectory = 'C:\\xampp\\htdocs\\photobooth\\photobooth-backend\\public\\raw_photos';
 
-            // Cek apakah folder ada
+            // Pastikan folder laragon ada
             if (!File::exists($directory)) {
-                return response()->json(['success' => false, 'message' => 'Folder raw_photos belum ada'], 404);
+                File::makeDirectory($directory, 0755, true);
             }
 
-            // Ambil semua file di dalam folder
-            $files = File::files($directory);
+            $files = [];
+
+            // Scan folder Laragon
+            if (File::exists($directory)) {
+                $files = array_merge($files, File::files($directory));
+            }
+
+            // Scan folder XAMPP sebagai fallback jika ada
+            if (File::exists($xamppDirectory)) {
+                $files = array_merge($files, File::files($xamppDirectory));
+            }
 
             if (count($files) === 0) {
                 return response()->json(['success' => false, 'message' => 'Belum ada foto'], 404);
@@ -164,6 +203,15 @@ class PhotoBoothSessionController extends Controller
             // Ambil file urutan pertama (paling baru)
             $latestFile = $files[0];
             $filename = $latestFile->getFilename();
+
+            // Jika file terbaru berada di folder XAMPP, salin ke folder Laragon agar bisa diakses via URL
+            if ($latestFile->getPath() !== $directory) {
+                $destPath = $directory . '/' . $filename;
+                if (!File::exists($destPath)) {
+                    File::copy($latestFile->getRealPath(), $destPath);
+                }
+            }
+
             $url = url('api/raw-photo/' . $filename);
 
             return response()->json([

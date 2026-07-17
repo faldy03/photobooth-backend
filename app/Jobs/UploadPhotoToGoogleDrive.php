@@ -17,15 +17,17 @@ class UploadPhotoToGoogleDrive implements ShouldQueue
     protected $finalFileName;
     protected $finalFilePath;
     protected $rawPhotosData;
+    protected $sessionFolderName;
 
     /**
      * Menerima data nama dan lokasi file dari Controller
      */
-    public function __construct($finalFileName, $finalFilePath, $rawPhotosData = [])
+    public function __construct($finalFileName, $finalFilePath, $rawPhotosData = [], $sessionFolderName = null)
     {
         $this->finalFileName = $finalFileName;
         $this->finalFilePath = $finalFilePath;
         $this->rawPhotosData = $rawPhotosData;
+        $this->sessionFolderName = $sessionFolderName ?? 'session_default';
     }
 
     /**
@@ -38,8 +40,9 @@ class UploadPhotoToGoogleDrive implements ShouldQueue
             // Ambil file fisik dari storage lokal
             if (Storage::disk('public')->exists($this->finalFilePath)) {
                 $finalFileContent = Storage::disk('public')->get($this->finalFilePath);
-                Storage::disk('google')->put($this->finalFileName, $finalFileContent);
-                Log::info("Queue: Berhasil upload Final Photo - " . $this->finalFileName);
+                $gdrivePath = $this->sessionFolderName . '/' . $this->finalFileName;
+                Storage::disk('google')->put($gdrivePath, $finalFileContent);
+                Log::info("Queue: Berhasil upload Final Photo - " . $gdrivePath);
             }
         } catch (\Exception $e) {
             Log::error("Queue: Gagal upload Final Photo ke GDrive - " . $e->getMessage());
@@ -51,8 +54,9 @@ class UploadPhotoToGoogleDrive implements ShouldQueue
                 try {
                     if (Storage::disk('public')->exists($raw['path'])) {
                         $rawContent = Storage::disk('public')->get($raw['path']);
-                        Storage::disk('google')->put($raw['name'], $rawContent);
-                        Log::info("Queue: Berhasil upload Raw Photo - " . $raw['name']);
+                        $gdriveRawPath = $this->sessionFolderName . '/' . $raw['name'];
+                        Storage::disk('google')->put($gdriveRawPath, $rawContent);
+                        Log::info("Queue: Berhasil upload Raw Photo - " . $gdriveRawPath);
                     }
                 } catch (\Exception $e) {
                     Log::error("Queue: Gagal upload Raw Photo ke GDrive - " . $e->getMessage());

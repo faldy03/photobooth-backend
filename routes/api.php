@@ -12,6 +12,7 @@ use App\Http\Controllers\KioskDeviceController;
 use App\Http\Controllers\PhotoAssetController;
 use App\Http\Controllers\SystemSettingController;
 use App\Http\Controllers\PhotoBoothSessionController;
+use App\Http\Controllers\PhotoController;
 
 // Route Publik
 Route::post('/admin/login', [AuthController::class, 'login'])->middleware('throttle:5,1');
@@ -20,6 +21,8 @@ Route::post('/doku/notification', [TransactionController::class, 'notification']
 Route::get('/checkout/status/{invoice}', [TransactionController::class, 'checkStatus']);
 Route::get('/kiosk/settings', [SystemSettingController::class, 'index']);
 Route::get('/kiosk/frames', [PhotoAssetController::class, 'getActiveFrames']);
+Route::post('/photos/upload', [PhotoController::class, 'upload']);
+Route::post('/kiosk/ping', [KioskDeviceController::class, 'ping']);
 
 // =========================================================================
 // ROUTE INTI PHOTOBOOTH (Untuk Next.js & Node.js)
@@ -38,10 +41,7 @@ Route::get('/raw-photo/{filename}', function ($filename) {
     if (!File::exists($path)) {
         abort(404);
     }
-    return response()->file($path, [
-        'Access-Control-Allow-Origin' => '*',
-        'Access-Control-Allow-Methods' => 'GET, OPTIONS',
-    ]);
+    return response()->file($path);
 });
 
 // 4. Proxy Image (Untuk bypass CORS bingkai dari Storage)
@@ -57,7 +57,7 @@ Route::get('/proxy-image', function (Request $request) {
         $file = \Illuminate\Support\Facades\Storage::disk('public')->get($relativePath);
         $type = \Illuminate\Support\Facades\Storage::disk('public')->mimeType($relativePath);
         
-        return response($file, 200)->header('Content-Type', $type)->header('Access-Control-Allow-Origin', '*');
+        return response($file, 200)->header('Content-Type', $type);
     }
     
     return response()->json(['error' => 'Image not found'], 404);

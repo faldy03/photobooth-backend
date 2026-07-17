@@ -11,11 +11,40 @@ class KioskDeviceController extends Controller
     public function index()
     {
         // Mengambil data kios, sekalian menghitung jumlah sesi foto yang pernah dilakukan mesin ini
-        $devices = KioskDevice::withCount('sessions')->latest()->get();
+        $devices = KioskDevice::withCount('sessions')->latest()->get()->map(function ($device) {
+            // Jika tidak ada aktivitas heartbeat lebih dari 1 menit, tandai dinamis sebagai offline
+            if ($device->last_seen && $device->last_seen->diffInMinutes(now()) >= 1) {
+                $device->status = 'offline';
+            }
+            return $device;
+        });
         
         return response()->json([
             'success' => true,
             'data'    => $devices
+        ], 200);
+    }
+
+    // 1b. Menerima Heartbeat / Ping dari Kios Lokal
+    public function ping(Request $request)
+    {
+        $validated = $request->validate([
+            'device_id'           => 'required|string|exists:kiosk_devices,device_id',
+            'is_camera_connected' => 'required|boolean',
+        ]);
+
+        $device = KioskDevice::where('device_id', $validated['device_id'])->first();
+
+        $device->update([
+            'last_seen'           => now(),
+            'is_camera_connected' => $validated['is_camera_connected'],
+            'status'              => 'active', // Aktifkan kembali saat ping diterima
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Heartbeat berhasil diterima.',
+            'data'    => $device
         ], 200);
     }
 

@@ -11,11 +11,12 @@ class KioskDevice extends Model
     use HasFactory;
 
     protected $fillable = [
-        'device_id', 'location_name', 'status', 'last_seen'
+        'device_id', 'location_name', 'status', 'last_seen', 'is_camera_connected'
     ];
 
     protected $casts = [
         'last_seen' => 'datetime',
+        'is_camera_connected' => 'boolean',
     ];
 
     // Relasi: 1 Mesin bisa menjalankan banyak Sesi Photobooth
