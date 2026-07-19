@@ -32,6 +32,25 @@ Route::get('/create-storage-link', function () {
     }
 });
 
+Route::get('/storage-diagnostics', function () {
+    $publicPath = public_path();
+    $storagePath = storage_path('app/public');
+    
+    $symlinkInPublic = public_path('storage');
+    $symlinkInPublicHtml = $_SERVER['DOCUMENT_ROOT'] . '/storage';
+    
+    return response()->json([
+        'public_path' => $publicPath,
+        'document_root' => $_SERVER['DOCUMENT_ROOT'],
+        'storage_path' => $storagePath,
+        'public_storage_exists' => file_exists($symlinkInPublic),
+        'public_storage_is_link' => is_link($symlinkInPublic),
+        'public_html_storage_exists' => file_exists($symlinkInPublicHtml),
+        'public_html_storage_is_link' => is_link($symlinkInPublicHtml),
+        'public_html_storage_target' => is_link($symlinkInPublicHtml) ? readlink($symlinkInPublicHtml) : null,
+    ]);
+});
+
 // =========================================================================
 // ROUTE INTI PHOTOBOOTH (Untuk Next.js & Node.js)
 // =========================================================================
