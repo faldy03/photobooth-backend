@@ -51,6 +51,29 @@ Route::get('/storage-diagnostics', function () {
     ]);
 });
 
+Route::get('/fix-storage-link', function () {
+    $target = '/home/boog3197/photobooth_backend/storage/app/public';
+    $shortcut = '/home/boog3197/public_html/storage';
+    
+    // 1. Singkirkan folder fisik penghalang jika ada
+    if (file_exists($shortcut)) {
+        if (is_link($shortcut)) {
+            unlink($shortcut);
+        } else {
+            // Rename folder fisik lama agar aman
+            rename($shortcut, $shortcut . '_old_' . time());
+        }
+    }
+    
+    // 2. Buat symbolic link yang mengarah langsung ke folder storage inti
+    try {
+        symlink($target, $shortcut);
+        return response()->json(['success' => true, 'message' => 'Symbolic link folder storage sukses diperbaiki di public_html!']);
+    } catch (\Exception $e) {
+        return response()->json(['success' => false, 'message' => 'Gagal memperbaiki link: ' . $e->getMessage()]);
+    }
+});
+
 // =========================================================================
 // ROUTE INTI PHOTOBOOTH (Untuk Next.js & Node.js)
 // =========================================================================
