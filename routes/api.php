@@ -21,8 +21,16 @@ Route::post('/doku/notification', [TransactionController::class, 'notification']
 Route::get('/checkout/status/{invoice}', [TransactionController::class, 'checkStatus']);
 Route::get('/kiosk/settings', [SystemSettingController::class, 'index']);
 Route::get('/kiosk/frames', [PhotoAssetController::class, 'getActiveFrames']);
-Route::post('/photos/upload', [PhotoController::class, 'upload']);
 Route::post('/kiosk/ping', [KioskDeviceController::class, 'ping']);
+
+Route::get('/create-storage-link', function () {
+    try {
+        \Illuminate\Support\Facades\Artisan::call('storage:link');
+        return response()->json(['success' => true, 'message' => 'Storage symbolic link created successfully!']);
+    } catch (\Exception $e) {
+        return response()->json(['success' => false, 'message' => $e->getMessage()]);
+    }
+});
 
 // =========================================================================
 // ROUTE INTI PHOTOBOOTH (Untuk Next.js & Node.js)
