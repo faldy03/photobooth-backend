@@ -381,12 +381,40 @@ class TransactionController extends Controller
         $totalSukses = Transaction::where('payment_status', 'success')->count();
         $totalPending = Transaction::where('payment_status', 'pending')->count();
 
+        // Ambil data pendapatan harian selama 7 hari terakhir
+        $dailyData = [];
+        for ($i = 6; $i >= 0; $i--) {
+            $carbonDate = \Carbon\Carbon::now()->subDays($i);
+            $date = $carbonDate->format('Y-m-d');
+            $dailyData[$date] = [
+                'day' => $carbonDate->isoFormat('dddd'), // Nama hari, e.g. Senin, Selasa
+                'raw_date' => $date,
+                'revenue' => 0
+            ];
+        }
+
+        $queryResult = Transaction::where('payment_status', 'success')
+            ->where('created_at', '>=', \Carbon\Carbon::now()->subDays(6)->startOfDay())
+            ->selectRaw('DATE(created_at) as date, SUM(net_amount) as revenue')
+            ->groupBy('date')
+            ->get();
+
+        foreach ($queryResult as $row) {
+            $formattedDate = $row->date;
+            if (isset($dailyData[$formattedDate])) {
+                $dailyData[$formattedDate]['revenue'] = (int) $row->revenue;
+            }
+        }
+
+        $dailyRevenueList = array_values($dailyData);
+
         return response()->json([
             'success' => true,
             'data'    => [
                 'total_revenue' => (int) $totalPendapatan,
                 'total_success' => $totalSukses,
                 'total_pending' => $totalPending,
+                'daily_revenue' => $dailyRevenueList
             ]
         ], 200);
     }
