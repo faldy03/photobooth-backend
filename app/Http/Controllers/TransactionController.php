@@ -390,4 +390,44 @@ class TransactionController extends Controller
             ]
         ], 200);
     }
+
+    // ==========================================
+    // 7. Hapus Transaksi Tunggal
+    // ==========================================
+    public function destroy($id)
+    {
+        $transaction = Transaction::find($id);
+
+        if (!$transaction) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Transaksi tidak ditemukan.'
+            ], 404);
+        }
+
+        $transaction->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Transaksi berhasil dihapus.'
+        ], 200);
+    }
+
+    // ==========================================
+    // 8. Hapus Banyak Transaksi (Batch Delete)
+    // ==========================================
+    public function batchDelete(Request $request)
+    {
+        $validated = $request->validate([
+            'ids' => 'required|array',
+            'ids.*' => 'integer|exists:transactions,id',
+        ]);
+
+        Transaction::whereIn('id', $validated['ids'])->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Semua transaksi terpilih berhasil dihapus.'
+        ], 200);
+    }
 }

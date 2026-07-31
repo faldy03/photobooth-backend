@@ -120,7 +120,8 @@ Route::middleware(['auth:sanctum', IsAdmin::class])->prefix('admin')->group(func
     Route::apiResource('users', UserController::class);
     Route::get('/transactions/export', [TransactionController::class, 'exportReport']);
     Route::get('/transactions/statistics', [TransactionController::class, 'statistics']);
-    Route::apiResource('transactions', TransactionController::class)->only(['index', 'exportReport']);
+    Route::delete('/transactions/batch-delete', [TransactionController::class, 'batchDelete']);
+    Route::apiResource('transactions', TransactionController::class)->only(['index', 'destroy']);
     Route::apiResource('kiosk-devices', KioskDeviceController::class);
     Route::apiResource('photo-assets', PhotoAssetController::class);
     Route::put('/system-settings', [SystemSettingController::class, 'update']);
