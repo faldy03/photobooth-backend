@@ -59,10 +59,8 @@ class CleanExpiredPhotos extends Command
                 $rawPhoto->delete();
             }
 
-            // Set final_photo_path ke null agar tidak diproses lagi berikutnya
-            $session->update([
-                'final_photo_path' => null
-            ]);
+            // Hapus record session dari database agar database bersih dan aman
+            $session->delete();
 
             $sessionCleaned++;
         }
