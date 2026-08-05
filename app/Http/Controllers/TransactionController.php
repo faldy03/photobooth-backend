@@ -164,6 +164,14 @@ class TransactionController extends Controller
             ], 500);
         }
 
+        // Simpan referenceNo ke webhook_log untuk pencarian status cadangan
+        if (isset($dokuResponse['reference_no'])) {
+            $transaction->webhook_log = [
+                'doku_reference_no' => $dokuResponse['reference_no']
+            ];
+            $transaction->save();
+        }
+
         // Return sukses dengan data lengkap
         return response()->json([
             'success' => true,
@@ -396,8 +404,9 @@ class TransactionController extends Controller
 
         if ($response->successful() && $response->json('responseCode') === '2004700') {
             return [
-                'success'   => true,
-                'qr_string' => $response->json('qrContent')
+                'success'      => true,
+                'qr_string'    => $response->json('qrContent'),
+                'reference_no' => $response->json('referenceNo')
             ];
         }
 
@@ -542,10 +551,17 @@ class TransactionController extends Controller
 
             $timestamp = now()->setTimezone('Asia/Jakarta')->format('Y-m-d\TH:i:sP');
 
+            // Ambil referenceNo DOKU dari database
+            $dokuRef = '';
+            if ($transaction && $transaction->webhook_log && isset($transaction->webhook_log['doku_reference_no'])) {
+                $dokuRef = $transaction->webhook_log['doku_reference_no'];
+            }
+
             $payload = [
                 "serviceCode"                => "47", // QRIS MPM
                 "merchantId"                 => $merchantId,
-                "originalPartnerReferenceNo" => $invoiceNumber
+                "originalPartnerReferenceNo" => $invoiceNumber,
+                "originalReferenceNo"        => $dokuRef
             ];
 
             $jsonPayload = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
