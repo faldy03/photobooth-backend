@@ -258,8 +258,10 @@ class TransactionController extends Controller
         }
 
         // Cek langsung ke DOKU API sebagai cadangan jika status di DB masih pending
+        $debugDoku = null;
         if ($transaction->payment_status === 'pending') {
             $dokuStatus = $this->checkQrisStatusFromDoku($transaction->invoice_number, $transaction->net_amount);
+            $debugDoku = $dokuStatus;
             if ($dokuStatus['success'] && $dokuStatus['status'] === 'success') {
                 $transaction->payment_status = 'success';
 
@@ -284,9 +286,8 @@ class TransactionController extends Controller
         return response()->json([
             'success'        => true,
             'payment_status' => $transaction->payment_status,
-            'id'             => $transaction->id, // ✅ FIX (opsional): disertakan juga di sini untuk
-                                                   // validasi silang / jaga-jaga jika frontend butuh
-                                                   // konfirmasi ulang id integer transaksi ini.
+            'id'             => $transaction->id,
+            'debug_doku'     => $debugDoku, // ✅ Temp debug info
         ]);
     }
 
