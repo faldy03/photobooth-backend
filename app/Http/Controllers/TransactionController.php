@@ -164,13 +164,12 @@ class TransactionController extends Controller
             ], 500);
         }
 
-        // Simpan referenceNo ke webhook_log untuk pencarian status cadangan
-        if (isset($dokuResponse['reference_no'])) {
-            $transaction->webhook_log = [
-                'doku_reference_no' => $dokuResponse['reference_no']
-            ];
-            $transaction->save();
-        }
+        // Simpan referenceNo dan Raw Response ke webhook_log untuk pencarian status cadangan
+        $transaction->webhook_log = [
+            'doku_reference_no' => $dokuResponse['reference_no'] ?? null,
+            'raw_generate_response' => $dokuResponse['raw_response'] ?? null
+        ];
+        $transaction->save();
 
         // Return sukses dengan data lengkap
         return response()->json([
@@ -406,7 +405,8 @@ class TransactionController extends Controller
             return [
                 'success'      => true,
                 'qr_string'    => $response->json('qrContent'),
-                'reference_no' => $response->json('referenceNo')
+                'reference_no' => $response->json('referenceNo'),
+                'raw_response' => $response->json()
             ];
         }
 
