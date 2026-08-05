@@ -588,8 +588,12 @@ class TransactionController extends Controller
 
             if ($response->successful()) {
                 $data = $response->json();
-                // responseCode 2005000 adalah kode SNAP standar untuk transaksi yang sukses/lunas
-                if (isset($data['responseCode']) && $data['responseCode'] === '2005000') {
+                
+                // DOKU SNAP: responseCode 2005100 = Inquiry sukses, latestTransactionStatus "00" = Lunas/Success
+                $isProcessed = isset($data['responseCode']) && $data['responseCode'] === '2005100';
+                $isPaid = isset($data['latestTransactionStatus']) && $data['latestTransactionStatus'] === '00';
+
+                if ($isProcessed && $isPaid) {
                     return [
                         'success' => true,
                         'status'  => 'success',
