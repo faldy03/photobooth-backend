@@ -552,6 +552,7 @@ class TransactionController extends Controller
             $timestamp = now()->setTimezone('Asia/Jakarta')->format('Y-m-d\TH:i:sP');
 
             // Ambil referenceNo DOKU dari database
+            $transaction = Transaction::where('invoice_number', $invoiceNumber)->first();
             $dokuRef = '';
             if ($transaction && $transaction->webhook_log && isset($transaction->webhook_log['doku_reference_no'])) {
                 $dokuRef = $transaction->webhook_log['doku_reference_no'];
