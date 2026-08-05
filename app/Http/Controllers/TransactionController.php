@@ -545,8 +545,7 @@ class TransactionController extends Controller
             $payload = [
                 "serviceCode"                => "47", // QRIS MPM
                 "merchantId"                 => $merchantId,
-                "originalPartnerReferenceNo" => $invoiceNumber,
-                "originalReferenceNo"        => ""
+                "originalPartnerReferenceNo" => $invoiceNumber
             ];
 
             $jsonPayload = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
