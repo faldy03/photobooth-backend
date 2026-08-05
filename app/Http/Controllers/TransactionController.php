@@ -538,7 +538,7 @@ class TransactionController extends Controller
 
             $merchantId = env('DOKU_MERCHANT_ID', '21639');
             $channelId  = env('DOKU_CHANNEL_ID', '95051');
-            $targetPath = '/snap-adapter/b2b/v1.0/qr/qr-mpm-status';
+            $targetPath = '/snap-adapter/b2b/v1.0/qr/qr-mpm-query';
 
             $timestamp = now()->setTimezone('Asia/Jakarta')->format('Y-m-d\TH:i:sP');
 
