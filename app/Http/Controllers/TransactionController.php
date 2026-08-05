@@ -204,8 +204,20 @@ class TransactionController extends Controller
                 // Simpan log asli dari DOKU untuk keperluan audit
                 $transaction->webhook_log = json_encode($payload);
 
-                // Eksekusi jika pembayaran sukses dan status masih pending
-                if ($isSuccess && $transaction->payment_status === 'pending') {
+                // Keamanan Ganda (Double Security Check)
+                $isValidSignature = $this->verifyDokuSignature($request);
+                $isVerifiedByApi = false;
+
+                if (!$isValidSignature && $transaction->payment_status === 'pending') {
+                    // Jika signature webhook tidak lolos, kita lakukan verifikasi silang langsung ke DOKU API untuk memastikan keamanan
+                    $dokuStatus = $this->checkQrisStatusFromDoku($transaction->invoice_number, $transaction->net_amount);
+                    if ($dokuStatus['success'] && $dokuStatus['status'] === 'success') {
+                        $isVerifiedByApi = true;
+                    }
+                }
+
+                // Eksekusi jika pembayaran sukses (lolos verifikasi signature ATAU terverifikasi via API DOKU)
+                if ($transaction->payment_status === 'pending' && $isSuccess && ($isValidSignature || $isVerifiedByApi)) {
                     $transaction->payment_status = 'success';
 
                     if ($transaction->voucher_id) {
@@ -243,6 +255,30 @@ class TransactionController extends Controller
                 'success' => false,
                 'message' => 'Transaksi tidak ditemukan'
             ], 404);
+        }
+
+        // Cek langsung ke DOKU API sebagai cadangan jika status di DB masih pending
+        if ($transaction->payment_status === 'pending') {
+            $dokuStatus = $this->checkQrisStatusFromDoku($transaction->invoice_number, $transaction->net_amount);
+            if ($dokuStatus['success'] && $dokuStatus['status'] === 'success') {
+                $transaction->payment_status = 'success';
+
+                if ($transaction->voucher_id) {
+                    $voucher = Voucher::find($transaction->voucher_id);
+                    if ($voucher) {
+                        $voucher->increment('used_count');
+                        
+                        VoucherUsage::firstOrCreate([
+                            'transaction_id' => $transaction->id
+                        ], [
+                            'voucher_id'       => $voucher->id,
+                            'discount_applied' => $transaction->gross_amount - $transaction->net_amount,
+                        ]);
+                    }
+                }
+
+                $transaction->save();
+            }
         }
 
         return response()->json([
@@ -457,5 +493,105 @@ class TransactionController extends Controller
             'success' => true,
             'message' => 'Semua transaksi terpilih berhasil dihapus.'
         ], 200);
+    }
+
+    // ==========================================
+    // Private: Verifikasi Signature Webhook DOKU SNAP
+    // ==========================================
+    private function verifyDokuSignature(Request $request)
+    {
+        $signature = $request->header('X-SIGNATURE');
+        $timestamp = $request->header('X-TIMESTAMP');
+
+        if (!$signature || !$timestamp) {
+            return false;
+        }
+
+        $secretKey = env('DOKU_SECRET_KEY');
+        $targetPath = '/api/doku/notification'; // Path webhook
+        
+        $body = $request->getContent();
+        $hashBody = strtolower(hash('sha256', $body));
+
+        $stringToSign = "POST:$targetPath:$hashBody:$timestamp";
+        $expectedSignature = base64_encode(hash_hmac('sha512', $stringToSign, $secretKey, true));
+
+        return hash_equals($expectedSignature, $signature);
+    }
+
+    // ==========================================
+    // Private: Cek Status QRIS Langsung ke DOKU API
+    // ==========================================
+    private function checkQrisStatusFromDoku($invoiceNumber, $amount)
+    {
+        try {
+            $tokenData = $this->getDokuSnapToken();
+            if (!$tokenData['success']) {
+                return ['success' => false, 'message' => 'Access token request failed'];
+            }
+
+            $accessToken = $tokenData['token'];
+            $clientId  = env('DOKU_CLIENT_ID');
+            $secretKey = env('DOKU_SECRET_KEY');
+            $baseUrl   = env('DOKU_URL', 'https://api-sandbox.doku.com');
+
+            $merchantId = env('DOKU_MERCHANT_ID', '21639');
+            $channelId  = env('DOKU_CHANNEL_ID', '95051');
+            $targetPath = '/snap-adapter/b2b/v1.0/qr/qr-mpm-status';
+
+            $timestamp = now()->setTimezone('Asia/Jakarta')->format('Y-m-d\TH:i:sP');
+
+            $payload = [
+                "serviceCode"        => "47", // QRIS MPM
+                "merchantId"         => $merchantId,
+                "partnerReferenceNo" => $invoiceNumber,
+                "amount"             => [
+                    "value"    => number_format($amount, 2, '.', ''),
+                    "currency" => "IDR"
+                ]
+            ];
+
+            $jsonPayload = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+            $hashBody    = strtolower(hash('sha256', $jsonPayload));
+
+            $stringToSign = "POST:$targetPath:$accessToken:$hashBody:$timestamp";
+            $signature    = base64_encode(hash_hmac('sha512', $stringToSign, $secretKey, true));
+
+            $externalIdNumeric = date('YmdHis') . rand(1000, 9999);
+
+            $response = Http::withHeaders([
+                'Authorization' => "Bearer $accessToken",
+                'X-TIMESTAMP'   => $timestamp,
+                'X-SIGNATURE'   => $signature,
+                'X-PARTNER-ID'  => $clientId,
+                'X-EXTERNAL-ID' => $externalIdNumeric,
+                'CHANNEL-ID'    => $channelId,
+                'Content-Type'  => 'application/json',
+                'Accept'        => 'application/json'
+            ])->withBody($jsonPayload, 'application/json')->post($baseUrl . $targetPath);
+
+            if ($response->successful()) {
+                $data = $response->json();
+                // responseCode 2005000 adalah kode SNAP standar untuk transaksi yang sukses/lunas
+                if (isset($data['responseCode']) && $data['responseCode'] === '2005000') {
+                    return [
+                        'success' => true,
+                        'status'  => 'success',
+                        'data'    => $data
+                    ];
+                }
+            }
+
+            return [
+                'success' => false,
+                'status'  => 'pending',
+                'message' => 'Status pending atau DOKU API menolak: ' . $response->body()
+            ];
+        } catch (\Exception $e) {
+            return [
+                'success' => false,
+                'message' => $e->getMessage()
+            ];
+        }
     }
 }
