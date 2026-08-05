@@ -208,11 +208,13 @@ class TransactionController extends Controller
             $transaction = Transaction::where('invoice_number', $invoice)->first();
 
             if ($transaction) {
-                // Simpan log asli dari DOKU untuk keperluan audit
-                $transaction->webhook_log = json_encode($payload);
+                // Gabungkan log lama (doku_reference_no) dengan data webhook baru agar tidak tertimpa
+                $currentLog = is_array($transaction->webhook_log) ? $transaction->webhook_log : json_decode($transaction->webhook_log, true) ?? [];
+                $currentLog['webhook_notification'] = $payload;
+                $transaction->webhook_log = $currentLog;
 
                 // Keamanan Ganda (Double Security Check)
-                $isValidSignature = $this->verifyDokuSignature($request);
+                $isValidSignature = $this->verifyDokuSignature($request) || $this->verifyJokulSignature($payload, $request);
                 $isVerifiedByApi = false;
 
                 if (!$isValidSignature && $transaction->payment_status === 'pending') {
@@ -608,5 +610,30 @@ class TransactionController extends Controller
                 'message' => $e->getMessage()
             ];
         }
+    }
+
+    // ==========================================
+    // Private: Verifikasi Signature Webhook DOKU Jokul (Format Non-SNAP)
+    // ==========================================
+    private function verifyJokulSignature($payload, Request $request)
+    {
+        $signature = $request->header('Signature');
+        if (!$signature) {
+            return false;
+        }
+
+        $clientId = env('DOKU_CLIENT_ID');
+        $secretKey = env('DOKU_SECRET_KEY');
+
+        $invoice = $payload['order']['invoice_number'] ?? '';
+        $amount = $payload['order']['amount'] ?? '';
+        $status = $payload['transaction']['status'] ?? '';
+
+        $signatureStr = $clientId . $invoice . $amount . $status;
+        $expected1 = hash_hmac('sha256', $signatureStr, $secretKey);
+        $expected2 = hash('sha256', $clientId . $secretKey . $invoice . $amount . $status);
+
+        return hash_equals(strtolower($expected1), strtolower($signature)) || 
+               hash_equals(strtolower($expected2), strtolower($signature));
     }
 }
