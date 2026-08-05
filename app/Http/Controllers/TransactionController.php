@@ -599,7 +599,8 @@ class TransactionController extends Controller
             return [
                 'success' => false,
                 'status'  => 'pending',
-                'message' => 'Status pending atau DOKU API menolak: ' . $response->body()
+                'message' => 'Status pending atau DOKU API menolak: ' . $response->body(),
+                'stored_webhook_log' => $transaction ? $transaction->webhook_log : null
             ];
         } catch (\Exception $e) {
             return [
