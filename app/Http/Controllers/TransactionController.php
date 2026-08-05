@@ -543,13 +543,10 @@ class TransactionController extends Controller
             $timestamp = now()->setTimezone('Asia/Jakarta')->format('Y-m-d\TH:i:sP');
 
             $payload = [
-                "serviceCode"        => "47", // QRIS MPM
-                "merchantId"         => $merchantId,
-                "partnerReferenceNo" => $invoiceNumber,
-                "amount"             => [
-                    "value"    => number_format($amount, 2, '.', ''),
-                    "currency" => "IDR"
-                ]
+                "serviceCode"                => "47", // QRIS MPM
+                "merchantId"                 => $merchantId,
+                "originalPartnerReferenceNo" => $invoiceNumber,
+                "originalReferenceNo"        => ""
             ];
 
             $jsonPayload = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
