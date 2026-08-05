@@ -313,10 +313,10 @@ class TransactionController extends Controller
         $secretKey = env('DOKU_SECRET_KEY');
         $baseUrl   = env('DOKU_URL', 'https://api-sandbox.doku.com');
 
-        // Hardcode konfigurasi Sandbox DOKU
-        $merchantId = '21639';
-        $terminalId = 'A01';
-        $channelId  = '95051';
+        // Konfigurasi Merchant & Channel (menggunakan .env agar dinamis saat Production)
+        $merchantId = env('DOKU_MERCHANT_ID', '21639');
+        $terminalId = env('DOKU_TERMINAL_ID', 'A01');
+        $channelId  = env('DOKU_CHANNEL_ID', '95051');
         $targetPath = '/snap-adapter/b2b/v1.0/qr/qr-mpm-generate';
 
         $timestamp      = now()->setTimezone('Asia/Jakarta')->format('Y-m-d\TH:i:sP');
